@@ -10,6 +10,8 @@ from langchain_openai import ChatOpenAI
 from typing_extensions import TypedDict
 from typing import Annotated, Literal
 import os
+import pyodbc
+import urllib.parse
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 
@@ -64,13 +66,45 @@ def first_tool_call(state: State) -> dict[str, list[AIMessage]]:
 
 def create_sql_agent():
     """Create and configure the SQL agent graph"""
-    # Initialize database
-    db_path = os.environ.get("DB_PATH", "sqlite:///Chinook.db")
-    db = SQLDatabase.from_uri(db_path)
+    # Initialize database with SQL Server connection
+    try:
+        # Get available ODBC drivers
+        print("Available ODBC drivers:")
+        for driver in pyodbc.drivers():
+            print(driver)
+        
+        # Use the SQL Server driver
+        driver_name = "SQL Server"  # Update this if you have a different driver
+        
+        # Build connection string
+        conn_str = (
+            f"DRIVER={{{driver_name}}};"
+            f"SERVER={os.environ.get('DB_SERVER')};"
+            f"DATABASE={os.environ.get('DB_NAME')};"
+            f"UID={os.environ.get('DB_USER')};"
+            f"PWD={os.environ.get('DB_PASSWORD')};"
+            "Encrypt=yes;"
+            "TrustServerCertificate=no;"
+            "Connection Timeout=60;"
+        )
+        
+        # Format for LangChain's SQLDatabase
+        db_path = f"mssql+pyodbc:///?odbc_connect={urllib.parse.quote_plus(conn_str)}"
+        
+        # Create SQLDatabase instance
+        db = SQLDatabase.from_uri(db_path)
+        print("SQL Server connection successful!")
+    except Exception as e:
+        print(f"Error connecting to SQL Server: {e}")
+        # Fallback to SQLite if SQL Server connection fails
+        db_path = os.environ.get("DB_PATH", "sqlite:///Chinook.db")
+        db = SQLDatabase.from_uri(db_path)
+        print(f"Falling back to SQLite database: {db_path}")
+    
     # Get tools
     list_tables_tool, get_schema_tool, query_tool, query_checker_tool = get_db_tools(db)
     print("Tables: ", list_tables_tool.invoke(""))
-    print(print(db.run("Select * from artist")))
+    
     # Create the workflow graph
     workflow = StateGraph(State)
     
