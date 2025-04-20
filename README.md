@@ -1,39 +1,43 @@
----
-page_type: sample
-description: "A minimal sample app that can be used to demonstrate deploying FastAPI apps to Azure App Service."
-languages:
-- python
-products:
-- azure
-- azure-app-service
----
+# SQL WhatsApp Agent - Natural Language Database Interface
 
-# Deploy a Python (FastAPI) web app to Azure App Service - Sample Application
+A sophisticated AI-powered service that enables business users to query their databases using natural language through WhatsApp. Built with FastAPI, LangChain, and GPT-4, this agent translates everyday business questions into SQL queries and returns human-readable responses.
 
-This is the sample FastAPI application for the Azure Quickstart [Deploy a Python (Django, Flask or FastAPI) web app to Azure App Service](https://docs.microsoft.com/en-us/azure/app-service/quickstart-python). For instructions on how to create the Azure resources and deploy the application to Azure, refer to the Quickstart article.
+## 📱 Demo Screenshot
 
-Sample applications are available for the other frameworks here:
-- Django [https://github.com/Azure-Samples/msdocs-python-django-webapp-quickstart](https://github.com/Azure-Samples/msdocs-python-django-webapp-quickstart)
-- Flask [https://github.com/Azure-Samples/msdocs-python-flask-webapp-quickstart](https://github.com/Azure-Samples/msdocs-python-flask-webapp-quickstart)
+![SQL WhatsApp Agent Demo](demo.jpeg)
 
-If you need an Azure account, you can [create one for free](https://azure.microsoft.com/en-us/free/).
+## 🚀 Key Features
 
-## Local Testing
+-   **Natural Language Interface**: Ask questions in plain English - no SQL knowledge required
+-   **WhatsApp Integration**: Query your database directly through WhatsApp
+-   **Intelligent Context Management**: Maintains conversation history for follow-up questions
+-   **Enterprise-Ready**:
+    -   Secure SQL Database integration
+    -   Real-time query processing
+    -   Error handling and input validation
+    -   Session-based conversation history
+
+## 💡 Business Use Cases
+
+-   **Sales Analysis**: "Show me top 5 customers by revenue this quarter"
+-   **Inventory Queries**: "Which products are running low on stock?"
+-   **Performance Metrics**: "Compare sales performance across regions"
+-   **Quick Reports**: "What's the total revenue for last month?"
+
+## 🛠️ Technology Stack
+
+-   **Backend Framework**: FastAPI
+-   **AI Components**:
+    -   OpenAI GPT-4 for natural language understanding
+    -   LangChain for agent orchestration
+-   **Database**: Azure SQL Database
+-   **Messaging**: Twilio WhatsApp Business API
+-   **Deployment**: Docker containerization
+
+## 🧪 Local Testing
 
 To try the application on your local machine:
 
-### Install the requirements
-
-`pip install -r requirements.txt`
-
-### Start the application
-
-`uvicorn main:app --reload`
-
-### Example call
-
-http://127.0.0.1:8000/
-
-## Next Steps
-
-To learn more about FastAPI, see [FastAPI](https://fastapi.tiangolo.com/).
+-   **Install the requirements**: `pip install -r requirements.txt`
+-   **Start the application**: `uvicorn main:app --reload`
+-   **Test with FastAPI Docs**: `http://localhost:8000/docs`

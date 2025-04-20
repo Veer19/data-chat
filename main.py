@@ -6,6 +6,7 @@ import os
 from dotenv import load_dotenv
 import json
 import logging
+from collections import defaultdict
 
 # Import our modules
 from sql_agent.agent import create_sql_agent
@@ -45,6 +46,9 @@ app.add_middleware(
 # SQL agent will be initialized on first use
 sql_agent = None
 
+# Store chat histories - using defaultdict to automatically create empty lists for new users
+chat_histories = defaultdict(list)
+
 # Dependency to get the SQL agent
 async def get_sql_agent():
     global sql_agent
@@ -56,11 +60,11 @@ async def get_sql_agent():
 # Define request models
 class QueryRequest(BaseModel):
     question: str
+    session_id: Optional[str] = None  # Add session_id to track conversations
 
 class QueryResponse(BaseModel):
     status: str
     question: str
-    sql_query: Optional[str] = None
     results: Optional[str] = None
     error: Optional[str] = None
 
@@ -71,35 +75,64 @@ class StreamResponse(BaseModel):
 @app.post("/query", response_model=QueryResponse)
 async def query_endpoint(request: QueryRequest, agent=Depends(get_sql_agent)):
     """Process a natural language query against the database"""
-    # try:
-    print("QUESTION", request.question)
-    
-    messages = agent.invoke(
-        {"messages": [("user", request.question)]}
-    )
-    for message in messages["messages"]:
-        print("MESSAGE", message)
-        print("____________________")
-    json_str = messages["messages"][-1].tool_calls[0]["args"]["final_answer"]
-    # for event in agent.stream(
-    #     {"messages": [("user", request.question)]}
-    # ):
-    #     print(event)
-    return {
-        "status": "success",
-        "question": request.question,
-        "results": json_str,
-        "error": None
-    }
-    # except Exception as e:
-    #     logger.error(f"Error processing query: {str(e)}")
-    #     return {
-    #         "status": "error",
-    #         "question": request.question,
-    #         "sql_query": None,
-    #         "results": None,
-    #         "error": str(e)
-    #     }
+    try:
+        # Get or create chat history for this session
+        session_id = request.session_id or "default"
+        history = chat_histories[session_id]
+        
+        # Add user's question to history
+        history.append(("user", request.question))
+        
+        # Invoke agent with full chat history
+        messages = agent.invoke({"messages": history})
+        
+        # Add agent's response to history
+        for message in messages["messages"]:
+            if hasattr(message, "content") and message.content:
+                history.append(("assistant", message.content))
+            if hasattr(message, "tool_calls"):
+                for tool_call in message.tool_calls:
+                    if tool_call["name"] == "SubmitFinalAnswer":
+                        history.append(("assistant", tool_call["args"]["final_answer"]))
+        
+        # Limit history size (optional)
+        if len(history) > 10:  # Keep last 10 messages
+            history = history[-10:]
+        chat_histories[session_id] = history
+        
+        # Get final answer from the last message
+        json_str = messages["messages"][-1].tool_calls[0]["args"]["final_answer"]
+        
+        return {
+            "status": "success",
+            "question": request.question,
+            "results": json_str,
+            "error": None
+        }
+        
+    except Exception as e:
+        logger.error(f"Error processing query: {str(e)}")
+        return {
+            "status": "error",
+            "question": request.question,
+            "results": None,
+            "error": str(e)
+        }
+
+@app.delete("/chat/{session_id}")
+async def clear_chat_history(session_id: str):
+    """Clear chat history for a specific session"""
+    if session_id in chat_histories:
+        del chat_histories[session_id]
+        return {"status": "success", "message": f"Chat history cleared for session {session_id}"}
+    return {"status": "error", "message": "Session not found"}
+
+@app.get("/chat/{session_id}")
+async def get_chat_history(session_id: str):
+    """Get chat history for a specific session"""
+    if session_id in chat_histories:
+        return {"status": "success", "history": chat_histories[session_id]}
+    return {"status": "error", "message": "Session not found"}
 
 @app.post("/stream")
 async def stream_endpoint(request: QueryRequest, agent=Depends(get_sql_agent)):
@@ -122,8 +155,7 @@ async def stream_endpoint(request: QueryRequest, agent=Depends(get_sql_agent)):
 @app.post("/whatsapp/webhook")
 async def whatsapp_webhook(request: Request, agent=Depends(get_sql_agent)):
     """Webhook for WhatsApp integration"""
-    form_data = await request.form()
-    return process_whatsapp_webhook(form_data, agent)
+    return await process_whatsapp_webhook(request, agent)
 
 @app.get("/")
 def health():

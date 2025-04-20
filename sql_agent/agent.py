@@ -1,29 +1,19 @@
-from typing import Annotated, Literal
-from langchain_community.utilities import SQLDatabase
-from typing import Any
-import getpass
-import os
 
+from typing import Any, Annotated
 from langchain_core.messages import ToolMessage
 from langchain_core.runnables import RunnableLambda, RunnableWithFallbacks
 from langgraph.prebuilt import ToolNode
-
 from langchain_core.messages import AIMessage
 from langchain_openai import ChatOpenAI
-
 from pydantic import BaseModel, Field
 from typing_extensions import TypedDict
-
 from langgraph.graph import END, StateGraph, START
 from langgraph.graph.message import AnyMessage, add_messages
-
 from langchain_community.agent_toolkits import SQLDatabaseToolkit
 from langchain_openai import ChatOpenAI
-
-from langchain_core.tools import tool
 from langchain_core.prompts import ChatPromptTemplate
-
 from sql_agent.db import create_db_connection
+
 
 class State(TypedDict):
     messages: Annotated[list[AnyMessage], add_messages]

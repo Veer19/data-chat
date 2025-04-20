@@ -1,26 +1,40 @@
-from fastapi import Response
+from fastapi import Response, Request
 from twilio.twiml.messaging_response import MessagingResponse
+from twilio.request_validator import RequestValidator
 import logging
 import os
-import requests
 from typing import Dict, Any
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def process_whatsapp_webhook(form_data: Dict[str, str], sql_agent: Any) -> Response:
-    """
-    Process incoming WhatsApp webhook requests
+# Add Twilio request validation
+async def validate_twilio_request(request: Request) -> bool:
+    validator = RequestValidator(os.environ.get('TWILIO_AUTH_TOKEN'))
     
-    Args:
-        form_data: The form data from the webhook request
-        sql_agent: The SQL agent to process queries
-        
-    Returns:
-        A Twilio response
-    """
+    # Get the request URL
+    url = str(request.url)
+    
+    # Get form data - must await it
+    form_data = await request.form()
+    post_data = dict(form_data)
+    
+    # Get the X-Twilio-Signature header
+    signature = request.headers.get('X-TWILIO-SIGNATURE', '')
+    
+    return validator.validate(url, post_data, signature)
+
+async def process_whatsapp_webhook(request: Request, sql_agent: Any) -> Response:
+    """Process incoming WhatsApp webhook requests"""
     try:
+        # Validate the request is from Twilio
+        if not await validate_twilio_request(request):
+            logger.warning("Invalid Twilio signature")
+            return Response(status_code=403)
+        
+        # Get form data
+        form_data = await request.form()
+        
         # Get the message from the request
         incoming_msg = form_data.get('Body', '').strip()
         sender = form_data.get('From', '')
@@ -54,26 +68,33 @@ def process_query_for_whatsapp(agent: Any, question: str) -> str:
         Formatted response for WhatsApp
     """
     try:
-        # Log the events for debugging
-        events = []
-        for event in agent.stream({"messages": [("user", question)]}):
-            events.append(event)
-            logger.info(f"Event: {event}")
-        
-        # Get the final result
+        # Just use invoke, no need for stream
         messages = agent.invoke({"messages": [("user", question)]})
+        logger.info(f"Agent response: {messages}")
         
-        # Extract the final answer
-        for message in reversed(messages["messages"]):
-            if hasattr(message, "tool_calls"):
-                for tool_call in message.tool_calls:
-                    if tool_call.get("name") == "SubmitFinalAnswer":
-                        # Format the response for WhatsApp
-                        reply_text = f"📊 *Results*\n\n{tool_call['args']['final_answer']}"
-                        return reply_text
+        # Get the last message which should have the final answer
+        last_message = messages["messages"][-1]
         
-        # If no final answer found
-        return "❌ Sorry, I couldn't find an answer to your question."
+        # Check if we have a final answer
+        if hasattr(last_message, "tool_calls"):
+            for tool_call in last_message.tool_calls:
+                if tool_call["name"] == "SubmitFinalAnswer":
+                    answer = tool_call["args"]["final_answer"]
+                    # Format nicely for WhatsApp
+                    formatted_answer = (
+                        f"{answer}\n\n"
+                    )
+                    return formatted_answer
+        
+        # If we didn't get a final answer
+        return (
+            "❌ I couldn't process that query.\n\n"
+            "Try rephrasing your question or ask something else! 🤔"
+        )
+        
     except Exception as e:
         logger.error(f"Error in process_query_for_whatsapp: {str(e)}")
-        return f"❌ Error processing your query: {str(e)}" 
+        return (
+            "❌ Oops! Something went wrong.\n\n"
+            "Please try asking your question again in a different way."
+        ) 
