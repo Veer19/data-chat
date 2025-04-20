@@ -4,7 +4,7 @@ A sophisticated AI-powered service that enables business users to query their da
 
 ## 📱 Demo Screenshot
 
-![SQL WhatsApp Agent Demo](demo.jpeg)
+<img src="demo.jpeg" alt="SQL WhatsApp Agent Demo" width="300">
 
 ## 🚀 Key Features
 
